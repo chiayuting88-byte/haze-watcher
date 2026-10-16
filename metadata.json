@@ -1,0 +1,6 @@
+{
+  "name": "BreatheSG - Singapore Live PSI & Air Quality Alert",
+  "description": "Real-time Singapore PSI & PM2.5 air quality tracker with interactive regional map, official NEA health advisories, and instant push alerts for unhealthy haze conditions.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
