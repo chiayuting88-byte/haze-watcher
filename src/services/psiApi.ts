@@ -173,6 +173,53 @@ export async function fetchLivePsi(): Promise<PsiDataRecord> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6000);
 
+  // 1. Try local serverless endpoint /api/psi first
+  try {
+    const serverlessRes = await fetch('/api/psi', { signal: controller.signal });
+    if (serverlessRes.ok) {
+      const serverlessJson = await serverlessRes.json();
+      if (serverlessJson && serverlessJson.readings) {
+        clearTimeout(timeoutId);
+        const r = serverlessJson.readings;
+        const psi24 = ensureRegionalValues(r.psi_twenty_four_hourly, 45);
+        const pm2524 = ensureRegionalValues(r.pm25_twenty_four_hourly, 15);
+        const pm25OneHr = ensureRegionalValues(r.pm25_one_hourly || r.pm25_twenty_four_hourly, 16);
+
+        return {
+          timestamp: serverlessJson.timestamp || new Date().toISOString(),
+          updateTimestamp: serverlessJson.updatedTimestamp || new Date().toISOString(),
+          readings: {
+            psi_twenty_four_hourly: psi24,
+            pm25_twenty_four_hourly: pm2524,
+            pm25_one_hourly: pm25OneHr,
+            pm10_twenty_four_hourly: ensureRegionalValues(r.pm10_twenty_four_hourly, 25),
+            pm10_sub_index: ensureRegionalValues(r.pm10_sub_index, 25),
+            pm25_sub_index: ensureRegionalValues(r.pm25_sub_index, psi24.national),
+            o3_sub_index: ensureRegionalValues(r.o3_sub_index, 16),
+            o3_eight_hour_max: ensureRegionalValues(r.o3_eight_hour_max, 32),
+            co_sub_index: ensureRegionalValues(r.co_sub_index, 4),
+            co_eight_hour_max: ensureRegionalValues(r.co_eight_hour_max, 0.5),
+            so2_sub_index: ensureRegionalValues(r.so2_sub_index, 8),
+            so2_twenty_four_hourly: ensureRegionalValues(r.so2_twenty_four_hourly, 12),
+            no2_one_hour_max: ensureRegionalValues(r.no2_one_hour_max, 25),
+          },
+          source: 'live_gov_sg',
+          weather: {
+            windSpeedKmh: 14,
+            windDirection: 'South-South-West',
+            windDegrees: 200,
+            temperatureC: 30.5,
+            humidityPercent: 80,
+            hazeRiskLevel: psi24.national > 100 ? 'Elevated' : 'Low',
+          },
+        };
+      }
+    }
+  } catch {
+    // Continue to fallback
+  }
+
+  // 2. Direct fallback to data.gov.sg
   try {
     const psiPromise = fetch(PSI_API_ENDPOINT, { signal: controller.signal });
     const pm25Promise = fetch(PM25_API_ENDPOINT, { signal: controller.signal }).catch(() => null);
